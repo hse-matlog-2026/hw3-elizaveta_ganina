@@ -59,7 +59,7 @@ def is_binary(string: str) -> bool:
     Returns:
         ``True`` if the given string is a binary operator, ``False`` otherwise.
     """
-    return string == '&' or string == '|' or string == '->'
+    return string in {'&', '|', '->', '+', '<->', '-&', '-|'}
     # For Chapter 3:
     # return string in {'&', '|',  '->', '+', '<->', '-&', '-|'}
 
@@ -112,9 +112,9 @@ class Formula:
         if is_variable(self.root) or is_constant(self.root):
             return self.root
         if is_unary(self.root):
-            return self.root + str(self.first)
-        assert is_binary(self.root)
-        return '(' + str(self.first) + self.root + str(self.second) + ')'
+            return self.root + str(getattr(self, 'first'))
+        return '(' + str(getattr(self, 'first')) + self.root + str(getattr(self, 'second')) + ')'
+        # Task 1.1
 
     def __eq__(self, other: object) -> bool:
         """Compares the current formula with the given one.
@@ -150,14 +150,23 @@ class Formula:
         Returns:
             A set of all variable names used in the current formula.
         """
-        if is_variable(self.root):
-            return {self.root}
-        if is_constant(self.root):
-            return set()
-        if is_unary(self.root):
-            return self.first.variables()
-        assert is_binary(self.root)
-        return self.first.variables().union(self.second.variables())
+        res: Set[str] = set()
+        def walk(node: 'Formula'):
+            if node is None:
+                return
+            root = node.root
+            if is_variable(root):
+                res.add(root)
+                return
+            if is_constant(root):
+                return
+            left = getattr(node, 'first', None)
+            right = getattr(node, 'second', None)
+            walk(left)
+            walk(right)
+        walk(self)
+        return res
+        # Task 1.2
 
     @memoized_parameterless_method
     def operators(self) -> Set[str]:
@@ -167,15 +176,22 @@ class Formula:
             A set of all operators (including ``'T'`` and ``'F'``) used in the
             current formula.
         """
-        if is_variable(self.root):
-            return set()
-        if is_constant(self.root):
-            return {self.root}
-        if is_unary(self.root):
-            return {self.root}.union(self.first.operators())
-        assert is_binary(self.root)
-        return {self.root}.union(self.first.operators(),
-                                 self.second.operators())
+        ops: Set[str] = set()
+        def walk(node: 'Formula'):
+            if node is None:
+                return
+            root = node.root
+            if is_constant(root):
+                ops.add(root)
+                return
+            if is_variable(root):
+                return
+            ops.add(root)
+            walk(getattr(node, 'first', None))
+            walk(getattr(node, 'second', None))
+        walk(self)
+        return ops
+        # Task 1.3
         
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Union[Formula, None], str]:
@@ -194,52 +210,36 @@ class Formula:
             should be of ``None`` and an error message, where the error message
             is a string with some human-readable content.
         """
-        if len(string) == 0:
-            return None, 'Unexpected end of input'
-
-        if is_constant(string[0]):
+        if string == "":
+            return None, "empty string"
+        first_ch = string[0]
+        if 'p' <= first_ch <= 'z':
+            i = 1
+            while i < len(string) and string[i].isdecimal():
+                i += 1
+            return Formula(string[:i]), string[i:]
+        if string[0] in ('T', 'F'):
             return Formula(string[0]), string[1:]
-
-        if string[0] >= 'p' and string[0] <= 'z':
-            index = 1
-            while index < len(string) and string[index].isdecimal():
-                index += 1
-            variable = string[:index]
-            if is_variable(variable):
-                return Formula(variable), string[index:]
-
-        if is_unary(string[0]):
-            formula, remainder = Formula._parse_prefix(string[1:])
-            if formula is None:
-                return None, remainder
-            return Formula(string[0], formula), remainder
-
-        if string[0] == '(':
-            first, remainder = Formula._parse_prefix(string[1:])
-            if first is None:
-                return None, remainder
-            if remainder == '':
-                return None, 'Expected binary operator'
-
-            operator = None
-            max_op_length = min(3, len(remainder))
-            for length in range(max_op_length, 0, -1):
-                candidate = remainder[:length]
-                if is_binary(candidate):
-                    operator = candidate
-                    remainder = remainder[length:]
-                    break
-            if operator is None:
-                return None, 'Expected binary operator'
-
-            second, remainder = Formula._parse_prefix(remainder)
-            if second is None:
-                return None, remainder
-            if remainder == '' or remainder[0] != ')':
-                return None, 'Expected closing parenthesis'
-            return Formula(operator, first, second), remainder[1:]
-
-        return None, 'Invalid formula'
+        if string[0] == '~':
+            child, rem = Formula._parse_prefix(string[1:])
+            if child is None:
+                return None, rem
+            return Formula('~', child), rem
+        if string[0] != '(':
+            return None, "expected '(', variable, constant or unary"
+        left, rem_after_left = Formula._parse_prefix(string[1:])
+        if left is None:
+            return None, rem_after_left
+        for op in ('<->', '->', '-&', '-|', '+', '&', '|'):
+            if rem_after_left.startswith(op):
+                right, rem_after_right = Formula._parse_prefix(rem_after_left[len(op):])
+                if right is None:
+                    return None, rem_after_right
+                if rem_after_right == "" or rem_after_right[0] != ')':
+                    return None, "missing closing ')'"
+                return Formula(op, left, right), rem_after_right[1:]
+        return None, "missing or invalid binary operator"
+        # Task 1.4
 
     @staticmethod
     def is_formula(string: str) -> bool:
@@ -252,8 +252,9 @@ class Formula:
             ``True`` if the given string is a valid standard string
             representation of a formula, ``False`` otherwise.
         """
-        formula, remainder = Formula._parse_prefix(string)
-        return formula is not None and remainder == ''
+        parsed, rem = Formula._parse_prefix(string)
+        return parsed is not None and rem == ""
+        # Task 1.5
         
     @staticmethod
     def parse(string: str) -> Formula:
@@ -266,9 +267,9 @@ class Formula:
             A formula whose standard string representation is the given string.
         """
         assert Formula.is_formula(string)
-        formula, remainder = Formula._parse_prefix(string)
-        assert formula is not None and remainder == ''
-        return formula
+        parsed, rem = Formula._parse_prefix(string)
+        return parsed
+        # Task 1.6
 
     def polish(self) -> str:
         """Computes the polish notation representation of the current formula.
@@ -280,8 +281,8 @@ class Formula:
             return self.root
         if is_unary(self.root):
             return self.root + self.first.polish()
-        assert is_binary(self.root)
         return self.root + self.first.polish() + self.second.polish()
+        # Optional Task 1.7
 
     @staticmethod
     def parse_polish(string: str) -> Formula:
@@ -293,48 +294,45 @@ class Formula:
         Returns:
             A formula whose polish notation representation is the given string.
         """
-        def parse_prefix(s: str) -> Tuple[Union[Formula, None], str]:
-            if s == '':
-                return None, 'Unexpected end of input'
+        if string == "":
+            raise ValueError("empty string")
 
-            if is_constant(s[0]):
-                return Formula(s[0]), s[1:]
+        def parse_from(i: int):
+            if i >= len(string):
+                raise ValueError("unexpected end")
 
-            if s[0] >= 'p' and s[0] <= 'z':
-                index = 1
-                while index < len(s) and s[index].isdecimal():
-                    index += 1
-                name = s[:index]
-                if is_variable(name):
-                    return Formula(name), s[index:]
+            ch = string[i]
 
-            if is_unary(s[0]):
-                formula, remainder = parse_prefix(s[1:])
-                if formula is None:
-                    return None, remainder
-                return Formula(s[0], formula), remainder
+            if ch in ('T', 'F'):
+                return Formula(ch), i + 1
 
-            operator = None
-            if len(s) >= 2 and is_binary(s[:2]):
-                operator = s[:2]
-                remainder = s[2:]
-            elif is_binary(s[0]):
-                operator = s[0]
-                remainder = s[1:]
-            else:
-                return None, 'Invalid formula'
+            if 'p' <= ch <= 'z':
+                j = i + 1
+                while j < len(string) and string[j].isdecimal():
+                    j += 1
+                return Formula(string[i:j]), j
 
-            first, remainder = parse_prefix(remainder)
-            if first is None:
-                return None, remainder
-            second, remainder = parse_prefix(remainder)
-            if second is None:
-                return None, remainder
-            return Formula(operator, first, second), remainder
+            if ch == '~':
+                sub, j = parse_from(i + 1)
+                return Formula('~', sub), j
 
-        formula, remainder = parse_prefix(string)
-        assert formula is not None and remainder == ''
+            if ch in ('&', '|'):
+                left, j = parse_from(i + 1)
+                right, k = parse_from(j)
+                return Formula(ch, left, right), k
+
+            if string.startswith('->', i):
+                left, j = parse_from(i + 2)
+                right, k = parse_from(j)
+                return Formula('->', left, right), k
+
+            raise ValueError("invalid polish string")
+
+        formula, pos = parse_from(0)
+        if pos != len(string):
+            raise ValueError("invalid polish string")
         return formula
+        # Optional Task 1.8
 
     def substitute_variables(self, substitution_map: Mapping[str, Formula]) -> \
             Formula:
