@@ -64,6 +64,18 @@ def to_not_and(formula: Formula) -> Formula:
         A formula that has the same truth table as the given formula, but
         contains no constants or operators beyond ``'~'`` and ``'&'``.
     """
+    f = to_not_and_or(formula)
+    if is_variable(f.root) or is_constant(f.root):
+        return Formula(f.root)
+    if is_unary(f.root):
+        return Formula('~', to_not_and(f.first))
+    A = to_not_and(f.first)
+    B = to_not_and(f.second)
+    if f.root == '&':
+        return Formula('&', A, B)
+    if f.root == '|':
+        return Formula('~', Formula('&', Formula('~', A), Formula('~', B)))
+    return Formula(f.root, A, B)
     # Task 3.6a
 
 def to_nand(formula: Formula) -> Formula:
@@ -77,6 +89,22 @@ def to_nand(formula: Formula) -> Formula:
         A formula that has the same truth table as the given formula, but
         contains no constants or operators beyond ``'-&'``.
     """
+    f = to_not_and(formula)
+    if is_variable(f.root) or is_constant(f.root):
+        return Formula(f.root)
+    if is_unary(f.root):
+        A = to_nand(f.first)
+        return Formula('-&', A, A)
+    A = to_nand(f.first)
+    B = to_nand(f.second)
+    if f.root == '&':
+        nand_ab = Formula('-&', A, B)
+        return Formula('-&', nand_ab, nand_ab)
+    if f.root == '|':
+        na = Formula('-&', A, A)
+        nb = Formula('-&', B, B)
+        return Formula('-&', na, nb)
+    return Formula(f.root, A, B)
     # Task 3.6b
 
 def to_implies_not(formula: Formula) -> Formula:
@@ -90,6 +118,35 @@ def to_implies_not(formula: Formula) -> Formula:
         A formula that has the same truth table as the given formula, but
         contains no constants or operators beyond ``'->'`` and ``'~'``.
     """
+    if is_variable(formula.root):
+        return Formula(formula.root)
+    if is_constant(formula.root):
+        if formula.root == 'T':
+            return Formula('->', Formula('p'), Formula('p'))
+        return Formula('~', Formula('->', Formula('p'), Formula('p')))
+    if is_unary(formula.root):
+        return Formula('~', to_implies_not(formula.first))
+    A = to_implies_not(formula.first)
+    B = to_implies_not(formula.second)
+    if formula.root == '->':
+        return Formula('->', A, B)
+    if formula.root == '&':
+        return Formula('~', Formula('->', A, Formula('~', B)))
+    if formula.root == '|':
+        return Formula('->', Formula('~', A), B)
+    if formula.root == '+':
+        x = Formula('->', A, Formula('~', B))
+        y = Formula('->', B, Formula('~', A))
+        return Formula('~', Formula('->', x, Formula('~', y)))
+    if formula.root == '<->':
+        x = Formula('->', A, B)
+        y = Formula('->', B, A)
+        return Formula('~', Formula('->', x, Formula('~', y)))
+    if formula.root == '-&':
+        return Formula('~', Formula('->', A, Formula('~', B)))
+    if formula.root == '-|':
+        return Formula('~', Formula('->', Formula('~', A), B))
+    return Formula(formula.root, A, B)
     # Task 3.6c
 
 def to_implies_false(formula: Formula) -> Formula:
@@ -103,4 +160,33 @@ def to_implies_false(formula: Formula) -> Formula:
         A formula that has the same truth table as the given formula, but
         contains no constants or operators beyond ``'->'`` and ``'F'``.
     """
+    if is_variable(formula.root):
+        return Formula(formula.root)
+    if is_constant(formula.root):
+        if formula.root == 'T':
+            return Formula('->', Formula('p'), Formula('p'))
+        return Formula('~', Formula('->', Formula('p'), Formula('p')))
+    if is_unary(formula.root):
+        return Formula('~', to_implies_not(formula.first))
+    A = to_implies_not(formula.first)
+    B = to_implies_not(formula.second)
+    if formula.root == '->':
+        return Formula('->', A, B)
+    if formula.root == '&':
+        return Formula('~', Formula('->', A, Formula('~', B)))
+    if formula.root == '|':
+        return Formula('->', Formula('~', A), B)
+    if formula.root == '+':
+        x = Formula('->', A, Formula('~', B))
+        y = Formula('->', B, Formula('~', A))
+        return Formula('~', Formula('->', x, Formula('~', y)))
+    if formula.root == '<->':
+        x = Formula('->', A, B)
+        y = Formula('->', B, A)
+        return Formula('~', Formula('->', x, Formula('~', y)))
+    if formula.root == '-&':
+        return Formula('~', Formula('->', A, Formula('~', B)))
+    if formula.root == '-|':
+        return Formula('~', Formula('->', Formula('~', A), B))
+    return Formula(formula.root, A, B)
     # Task 3.6d
