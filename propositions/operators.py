@@ -22,6 +22,33 @@ def to_not_and_or(formula: Formula) -> Formula:
         contains no constants or operators beyond ``'~'``, ``'&'``, and
         ``'|'``.
     """
+    if is_variable(formula.root):
+        return Formula(formula.root)
+    if is_constant(formula.root):
+        return Formula(formula.root)
+    if is_unary(formula.root):
+        return Formula('~', to_not_and_or(formula.first))
+    A = to_not_and_or(formula.first)
+    B = to_not_and_or(formula.second)
+    if formula.root == '&':
+        return Formula('&', A, B)
+    if formula.root == '|':
+        return Formula('|', A, B)
+    if formula.root == '->':
+        return Formula('|', Formula('~', A), B)
+    if formula.root == '+':
+        left = Formula('&', A, Formula('~', B))
+        right = Formula('&', Formula('~', A), B)
+        return Formula('|', left, right)
+    if formula.root == '<->':
+        left = Formula('&', A, B)
+        right = Formula('&', Formula('~', A), Formula('~', B))
+        return Formula('|', left, right)
+    if formula.root == '-&':
+        return Formula('~', Formula('&', A, B))
+    if formula.root == '-|':
+        return Formula('~', Formula('|', A, B))
+    return Formula(formula.root, A, B)
     # Task 3.5
 
 def to_not_and(formula: Formula) -> Formula:

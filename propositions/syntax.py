@@ -357,6 +357,15 @@ class Formula:
         """
         for variable in substitution_map:
             assert is_variable(variable)
+        if is_variable(self.root):
+            return substitution_map[self.root] if self.root in substitution_map else Formula(self.root)
+        if is_constant(self.root):
+            return Formula(self.root)
+        if is_unary(self.root):
+            return Formula(self.root, self.first.substitute_variables(substitution_map))
+        return Formula(self.root,
+                    self.first.substitute_variables(substitution_map),
+                    self.second.substitute_variables(substitution_map))
         # Task 3.3
 
     def substitute_operators(self, substitution_map: Mapping[str, Formula]) -> \
@@ -384,7 +393,36 @@ class Formula:
             ~(~~(~x|~y)|~~z)
         """
         for operator in substitution_map:
-            assert is_constant(operator) or is_unary(operator) or \
-                   is_binary(operator)
+            assert is_constant(operator) or is_unary(operator) or is_binary(operator)
             assert substitution_map[operator].variables().issubset({'p', 'q'})
+        def replace_p_q(template: Formula, p_formula: Formula, q_formula: Formula) -> Formula:
+            if is_variable(template.root):
+                if template.root == 'p':
+                    return p_formula
+                if template.root == 'q':
+                    return q_formula
+                return Formula(template.root)
+            if is_constant(template.root):
+                return Formula(template.root)
+            if is_unary(template.root):
+                return Formula(template.root, replace_p_q(template.first, p_formula, q_formula))
+            return Formula(template.root,
+                        replace_p_q(template.first, p_formula, q_formula),
+                        replace_p_q(template.second, p_formula, q_formula))
+        if is_variable(self.root):
+            return Formula(self.root)
+        if is_constant(self.root):
+            return Formula(self.root)
+        if is_unary(self.root):
+            new_first = self.first.substitute_operators(substitution_map)
+            if self.root in substitution_map:
+                template = substitution_map[self.root]
+                return replace_p_q(template, new_first, None)
+            return Formula(self.root, new_first)
+        new_first = self.first.substitute_operators(substitution_map)
+        new_second = self.second.substitute_operators(substitution_map)
+        if self.root in substitution_map:
+            template = substitution_map[self.root]
+            return replace_p_q(template, new_first, new_second)
+        return Formula(self.root, new_first, new_second)
         # Task 3.4
