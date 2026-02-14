@@ -128,22 +128,23 @@ def to_implies_not(formula: Formula) -> Formula:
         return Formula('~', to_implies_not(formula.first))
     A = to_implies_not(formula.first)
     B = to_implies_not(formula.second)
-    if formula.root == '->':
-        return Formula('->', A, B)
     if formula.root == '&':
         return Formula('~', Formula('->', A, Formula('~', B)))
     if formula.root == '|':
         return Formula('->', Formula('~', A), B)
-    if formula.root == '+':
-        x = Formula('->', A, Formula('~', B))
-        y = Formula('->', B, Formula('~', A))
-        return Formula('~', Formula('->', x, Formula('~', y)))
+    if formula.root == '->':
+        return Formula('->', A, B)
     if formula.root == '<->':
-        x = Formula('->', A, B)
-        y = Formula('->', B, A)
-        return Formula('~', Formula('->', x, Formula('~', y)))
+        leftimp = Formula('->', A, B)
+        rightimp = Formula('->', B, A)
+        return Formula('~', Formula('->', leftimp, Formula('~', rightimp)))
+    if formula.root == '+':
+        leftimp = Formula('->', A, B)
+        rightimp = Formula('->', B, A)
+        eq = Formula('~', Formula('->', leftimp, Formula('~', rightimp)))
+        return Formula('~', eq)
     if formula.root == '-&':
-        return Formula('~', Formula('->', A, Formula('~', B)))
+        return Formula('->', A, Formula('~', B))
     if formula.root == '-|':
         return Formula('~', Formula('->', Formula('~', A), B))
     return Formula(formula.root, A, B)
@@ -163,30 +164,33 @@ def to_implies_false(formula: Formula) -> Formula:
     if is_variable(formula.root):
         return Formula(formula.root)
     if is_constant(formula.root):
-        if formula.root == 'T':
-            return Formula('->', Formula('p'), Formula('p'))
-        return Formula('~', Formula('->', Formula('p'), Formula('p')))
+        if formula.root == 'F':
+            return Formula('F')
+        return Formula('->', Formula('F'), Formula('F'))
     if is_unary(formula.root):
-        return Formula('~', to_implies_not(formula.first))
-    A = to_implies_not(formula.first)
-    B = to_implies_not(formula.second)
+        return Formula('->', to_implies_false(formula.first), Formula('F'))
+    A = to_implies_false(formula.first)
+    B = to_implies_false(formula.second)
+    if formula.root == '&':
+        return Formula('->', Formula('->', A, Formula('->', B, Formula('F'))), Formula('F'))
+    if formula.root == '|':
+        return Formula('->', Formula('->', A, Formula('F')), B)
     if formula.root == '->':
         return Formula('->', A, B)
-    if formula.root == '&':
-        return Formula('~', Formula('->', A, Formula('~', B)))
-    if formula.root == '|':
-        return Formula('->', Formula('~', A), B)
-    if formula.root == '+':
-        x = Formula('->', A, Formula('~', B))
-        y = Formula('->', B, Formula('~', A))
-        return Formula('~', Formula('->', x, Formula('~', y)))
     if formula.root == '<->':
-        x = Formula('->', A, B)
-        y = Formula('->', B, A)
-        return Formula('~', Formula('->', x, Formula('~', y)))
+        leftimp = Formula('->', A, B)
+        rightimp = Formula('->', B, A)
+        return Formula('->', Formula('->', leftimp, Formula('->', rightimp, Formula('F'))), Formula('F'))
+    if formula.root == '+':
+        leftimp = Formula('->', A, B)
+        rightimp = Formula('->', B, A)
+        eq = Formula('->', Formula('->', leftimp, Formula('->', rightimp, Formula('F'))), Formula('F'))
+        return Formula('->', eq, Formula('F'))
     if formula.root == '-&':
-        return Formula('~', Formula('->', A, Formula('~', B)))
+        and_map = Formula('->', Formula('->', A, Formula('->', B, Formula('F'))), Formula('F'))
+        return Formula('->', and_map, Formula('F'))
     if formula.root == '-|':
-        return Formula('~', Formula('->', Formula('~', A), B))
+        or_map = Formula('->', Formula('->', A, Formula('F')), B)
+        return Formula('->', or_map, Formula('F'))
     return Formula(formula.root, A, B)
     # Task 3.6d
