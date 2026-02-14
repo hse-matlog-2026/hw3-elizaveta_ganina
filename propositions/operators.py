@@ -25,7 +25,9 @@ def to_not_and_or(formula: Formula) -> Formula:
     if is_variable(formula.root):
         return Formula(formula.root)
     if is_constant(formula.root):
-        return Formula(formula.root)
+        if formula.root == 'T':
+            return Formula('|', Formula('p'), Formula('~', Formula('p')))
+        return Formula('&', Formula('p'), Formula('~', Formula('p')))
     if is_unary(formula.root):
         return Formula('~', to_not_and_or(formula.first))
     A = to_not_and_or(formula.first)

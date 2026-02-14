@@ -395,34 +395,34 @@ class Formula:
         for operator in substitution_map:
             assert is_constant(operator) or is_unary(operator) or is_binary(operator)
             assert substitution_map[operator].variables().issubset({'p', 'q'})
-        def replace_p_q(template: Formula, p_formula: Formula, q_formula: Formula) -> Formula:
+        def replace_template(template: Formula, p_formula: Formula, q_formula: Formula) -> Formula:
             if is_variable(template.root):
                 if template.root == 'p':
-                    return p_formula
+                    return p_formula if p_formula is not None else Formula('p')
                 if template.root == 'q':
-                    return q_formula
+                    return q_formula if q_formula is not None else Formula('q')
                 return Formula(template.root)
             if is_constant(template.root):
                 return Formula(template.root)
             if is_unary(template.root):
-                return Formula(template.root, replace_p_q(template.first, p_formula, q_formula))
+                return Formula(template.root, replace_template(template.first, p_formula, q_formula))
             return Formula(template.root,
-                        replace_p_q(template.first, p_formula, q_formula),
-                        replace_p_q(template.second, p_formula, q_formula))
+                        replace_template(template.first, p_formula, q_formula),
+                        replace_template(template.second, p_formula, q_formula))
         if is_variable(self.root):
             return Formula(self.root)
         if is_constant(self.root):
+            if self.root in substitution_map:
+                return replace_template(substitution_map[self.root], None, None)
             return Formula(self.root)
         if is_unary(self.root):
-            new_first = self.first.substitute_operators(substitution_map)
+            new_child = self.first.substitute_operators(substitution_map)
             if self.root in substitution_map:
-                template = substitution_map[self.root]
-                return replace_p_q(template, new_first, None)
-            return Formula(self.root, new_first)
+                return replace_template(substitution_map[self.root], new_child, None)
+            return Formula(self.root, new_child)
         new_first = self.first.substitute_operators(substitution_map)
         new_second = self.second.substitute_operators(substitution_map)
         if self.root in substitution_map:
-            template = substitution_map[self.root]
-            return replace_p_q(template, new_first, new_second)
+            return replace_template(substitution_map[self.root], new_first, new_second)
         return Formula(self.root, new_first, new_second)
         # Task 3.4
